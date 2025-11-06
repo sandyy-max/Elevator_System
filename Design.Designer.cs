@@ -37,6 +37,8 @@
             leftDoor2 = new PictureBox();
             rightDoor2 = new PictureBox();
             panel1 = new Panel();
+            btnUp = new PictureBox();
+            panel5 = new Panel();
             panel4 = new Panel();
             btnDown = new PictureBox();
             panel3 = new Panel();
@@ -52,8 +54,8 @@
             btnFloor1 = new PictureBox();
             doorTimer = new System.Windows.Forms.Timer(components);
             liftTimer = new System.Windows.Forms.Timer(components);
-            btnUp = new PictureBox();
-            panel5 = new Panel();
+            panel6 = new Panel();
+            panel7 = new Panel();
             ((System.ComponentModel.ISupportInitialize)floor1).BeginInit();
             ((System.ComponentModel.ISupportInitialize)leftDoor1).BeginInit();
             ((System.ComponentModel.ISupportInitialize)rightDoor1).BeginInit();
@@ -61,6 +63,7 @@
             ((System.ComponentModel.ISupportInitialize)leftDoor2).BeginInit();
             ((System.ComponentModel.ISupportInitialize)rightDoor2).BeginInit();
             panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)btnUp).BeginInit();
             ((System.ComponentModel.ISupportInitialize)btnDown).BeginInit();
             ((System.ComponentModel.ISupportInitialize)liftBox).BeginInit();
             panel2.SuspendLayout();
@@ -68,7 +71,6 @@
             ((System.ComponentModel.ISupportInitialize)btnOpen).BeginInit();
             ((System.ComponentModel.ISupportInitialize)btnFloor2).BeginInit();
             ((System.ComponentModel.ISupportInitialize)btnFloor1).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)btnUp).BeginInit();
             SuspendLayout();
             // 
             // floor1
@@ -140,6 +142,8 @@
             // 
             panel1.BackColor = Color.LightGray;
             panel1.Controls.Add(btnUp);
+            panel1.Controls.Add(panel7);
+            panel1.Controls.Add(panel6);
             panel1.Controls.Add(panel5);
             panel1.Controls.Add(panel4);
             panel1.Controls.Add(btnDown);
@@ -154,6 +158,25 @@
             panel1.Name = "panel1";
             panel1.Size = new Size(547, 678);
             panel1.TabIndex = 7;
+            // 
+            // btnUp
+            // 
+            btnUp.Image = Properties.Resources.Screenshot_2025_11_02_220650;
+            btnUp.Location = new Point(69, 118);
+            btnUp.Name = "btnUp";
+            btnUp.Size = new Size(56, 61);
+            btnUp.SizeMode = PictureBoxSizeMode.Zoom;
+            btnUp.TabIndex = 8;
+            btnUp.TabStop = false;
+            btnUp.Click += btnUp_Click;
+            // 
+            // panel5
+            // 
+            panel5.BackColor = Color.Gray;
+            panel5.Location = new Point(772, 118);
+            panel5.Name = "panel5";
+            panel5.Size = new Size(162, 280);
+            panel5.TabIndex = 9;
             // 
             // panel4
             // 
@@ -306,24 +329,20 @@
             liftTimer.Interval = 20;
             liftTimer.Tick += liftTimer_Tick;
             // 
-            // btnUp
+            // panel6
             // 
-            btnUp.Image = Properties.Resources.Screenshot_2025_11_02_220650;
-            btnUp.Location = new Point(69, 118);
-            btnUp.Name = "btnUp";
-            btnUp.Size = new Size(56, 61);
-            btnUp.SizeMode = PictureBoxSizeMode.Zoom;
-            btnUp.TabIndex = 8;
-            btnUp.TabStop = false;
-            btnUp.Click += btnUp_Click;
+            panel6.BackColor = Color.LightGray;
+            panel6.Location = new Point(368, 27);
+            panel6.Name = "panel6";
+            panel6.Size = new Size(176, 280);
+            panel6.TabIndex = 13;
             // 
-            // panel5
+            // panel7
             // 
-            panel5.BackColor = Color.Gray;
-            panel5.Location = new Point(772, 118);
-            panel5.Name = "panel5";
-            panel5.Size = new Size(162, 280);
-            panel5.TabIndex = 9;
+            panel7.Location = new Point(3, 27);
+            panel7.Name = "panel7";
+            panel7.Size = new Size(174, 280);
+            panel7.TabIndex = 9;
             // 
             // Design
             // 
@@ -346,6 +365,7 @@
             ((System.ComponentModel.ISupportInitialize)rightDoor2).EndInit();
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)btnUp).EndInit();
             ((System.ComponentModel.ISupportInitialize)btnDown).EndInit();
             ((System.ComponentModel.ISupportInitialize)liftBox).EndInit();
             panel2.ResumeLayout(false);
@@ -354,7 +374,6 @@
             ((System.ComponentModel.ISupportInitialize)btnOpen).EndInit();
             ((System.ComponentModel.ISupportInitialize)btnFloor2).EndInit();
             ((System.ComponentModel.ISupportInitialize)btnFloor1).EndInit();
-            ((System.ComponentModel.ISupportInitialize)btnUp).EndInit();
             ResumeLayout(false);
         }
 
@@ -383,5 +402,7 @@
         private Panel panel4;
         private PictureBox btnUp;
         private Panel panel5;
+        private Panel panel6;
+        private Panel panel7;
     }
 }

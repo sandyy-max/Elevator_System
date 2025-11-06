@@ -63,3 +63,4 @@ D:\C#HW\Lift\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics
 D:\C#HW\Lift\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Security.Cryptography.Pkcs.dll
 D:\C#HW\Lift\obj\Debug\net8.0-windows\Lift.csproj.AssemblyReference.cache
 D:\C#HW\Lift\obj\Debug\net8.0-windows\Lift.csproj.Up2Date
+D:\C#HW\Lift\obj\Debug\net8.0-windows\Lift.sourcelink.json

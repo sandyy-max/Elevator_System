@@ -1,28 +1,54 @@
 ﻿using System;
 using System.Data;
-
 using Microsoft.Data.SqlClient;
 
 namespace Lift
 {
-    /// <summary>
-    /// Handles all database operations using SQL Server
-    /// Follows Single Responsibility Principle - only database logic
-    /// Uses Disconnected Model with DataAdapter (Task 3 requirement)
-    /// </summary>
+    
     public class DatabaseHelper
     {
         private readonly string _connectionString =
             @"Server=DESKTOP-69H2049; Database=lift_log; 
               Trusted_Connection=True; TrustServerCertificate=True;";
 
-        /// <summary>
-        /// Insert a log entry into database
-        /// </summary>
+   
+        public bool TestConnection()
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    return true;
+                }
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Connection Error: {sqlEx.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Connection test failed: {ex.Message}");
+                return false;
+            }
+        }
+
+      
         public bool InsertLog(string action, int fromFloor, int toFloor, string status)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(action))
+                {
+                    throw new ArgumentException("Action cannot be empty");
+                }
+
+                if (string.IsNullOrWhiteSpace(status))
+                {
+                    throw new ArgumentException("Status cannot be empty");
+                }
+
                 string query = @"INSERT INTO ElevatorLogs (Timestamp, Action, FromFloor, ToFloor, Status)
                                  VALUES (@Timestamp, @Action, @FromFloor, @ToFloor, @Status);";
 
@@ -36,8 +62,19 @@ namespace Lift
                     cmd.Parameters.AddWithValue("@Status", status);
 
                     conn.Open();
-                    return cmd.ExecuteNonQuery() > 0;
+                    int rowsAffected = cmd.ExecuteNonQuery();
+                    return rowsAffected > 0;
                 }
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Insert Error: {sqlEx.Message}");
+                return false;
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation Error: {argEx.Message}");
+                return false;
             }
             catch (Exception ex)
             {
@@ -46,12 +83,10 @@ namespace Lift
             }
         }
 
-        /// <summary>
-        /// Get all logs from database using DataAdapter (Disconnected Model)
-        /// Task 3 requirement: Use DataAdapter
-        /// </summary>
+ 
         public DataSet GetAllLogs()
         {
+            DataSet ds = new DataSet();
             try
             {
                 string query = @"SELECT LogID, Timestamp, Action, FromFloor, ToFloor, Status 
@@ -61,41 +96,63 @@ namespace Lift
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 using (SqlDataAdapter adapter = new SqlDataAdapter(query, conn))
                 {
-                    DataSet ds = new DataSet();
                     adapter.Fill(ds);
-                    return ds;
                 }
+
+                return ds;
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Select Error: {sqlEx.Message}");
+                return ds; 
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Get logs failed: {ex.Message}");
-                return new DataSet();
+                return ds; 
             }
         }
 
-        /// <summary>
-        /// Test database connection
-        /// </summary>
-        public bool TestConnection()
+      
+        public bool DeleteLog(int logId)
         {
             try
             {
-                using (SqlConnection conn = new SqlConnection(_connectionString))
+                if (logId <= 0)
                 {
-                    conn.Open();
-                    return true;
+                    throw new ArgumentException("Invalid log ID");
                 }
+
+                string query = "DELETE FROM ElevatorLogs WHERE LogID = @LogID;";
+
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@LogID", logId);
+
+                    conn.Open();
+                    int rowsAffected = cmd.ExecuteNonQuery();
+                    return rowsAffected > 0;
+                }
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Delete Error: {sqlEx.Message}");
+                return false;
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation Error: {argEx.Message}");
+                return false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Connection test failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Delete log failed: {ex.Message}");
                 return false;
             }
         }
 
-        /// <summary>
-        /// Clear all logs (optional - for testing)
-        /// </summary>
+  
         public bool ClearAllLogs()
         {
             try
@@ -106,8 +163,14 @@ namespace Lift
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
                     conn.Open();
-                    return cmd.ExecuteNonQuery() >= 0;
+                    cmd.ExecuteNonQuery();
+                    return true;
                 }
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Clear Error: {sqlEx.Message}");
+                return false;
             }
             catch (Exception ex)
             {
@@ -116,14 +179,15 @@ namespace Lift
             }
         }
 
-        /// <summary>
-        /// Update logs using DataAdapter.Update() method (Task 3 requirement)
-        /// This demonstrates the disconnected model for updating
-        /// </summary>
         public bool UpdateLogsWithDataAdapter(DataSet dataSet)
         {
             try
             {
+                if (dataSet == null || dataSet.Tables.Count == 0)
+                {
+                    throw new ArgumentException("Dataset is empty");
+                }
+
                 string query = "SELECT * FROM ElevatorLogs";
 
                 using (SqlConnection conn = new SqlConnection(_connectionString))
@@ -134,14 +198,31 @@ namespace Lift
                     adapter.InsertCommand = builder.GetInsertCommand();
                     adapter.DeleteCommand = builder.GetDeleteCommand();
 
-                    return adapter.Update(dataSet.Tables[0]) > 0;
+                    int rowsAffected = adapter.Update(dataSet.Tables[0]);
+                    return rowsAffected > 0;
                 }
+            }
+            catch (SqlException sqlEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"SQL Update Error: {sqlEx.Message}");
+                return false;
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation Error: {argEx.Message}");
+                return false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Update with DataAdapter failed: {ex.Message}");
                 return false;
             }
+        }
+
+      
+        public string GetConnectionString()
+        {
+            return _connectionString;
         }
     }
 }

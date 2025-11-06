@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Data;
 using System.Windows.Forms;
 
@@ -12,16 +13,16 @@ namespace Lift
         // Animation state variables
         private bool doorAnimating = false;
         private bool liftAnimating = false;
-        private string doorAction = ""; // "open" or "close"
+        private string doorAction = "            "; 
 
         // Door positions for animation
-        private const int DOOR_SPEED = 3;  // Slower door movement
-        private const int LIFT_SPEED = 3;  // Slower lift movement
+        private const int DOOR_SPEED = 3;  
+        private const int LIFT_SPEED = 1; 
 
         // Lift positions
         private int liftTargetY;
-        private const int FLOOR1_Y = 405; // Floor 1 lift position
-        private const int FLOOR2_Y = 48;  // Floor 2 lift position
+        private const int FLOOR1_Y = 405; 
+        private const int FLOOR2_Y = 48;  
 
         // Door open positions for each floor
         private const int FLOOR1_LEFT_DOOR_OPEN = 140;
@@ -34,49 +35,162 @@ namespace Lift
         private const int FLOOR2_LEFT_DOOR_CLOSED = 284;
         private const int FLOOR2_RIGHT_DOOR_CLOSED = 359;
 
-        // Timer for auto-closing doors
+ 
         private System.Windows.Forms.Timer doorCloseTimer;
-        private const int DOOR_OPEN_DURATION = 3000; // 3 seconds
+        private const int DOOR_OPEN_DURATION = 3000;
+
+
+        private BackgroundWorker dbWorker;
 
         public Design()
         {
             InitializeComponent();
             InitializeElevator();
             InitializeDoorCloseTimer();
+            InitializeBackgroundWorker();
         }
 
-        /// <summary>
-        /// Initialize elevator object and subscribe to events
-        /// </summary>
+
         private void InitializeElevator()
         {
-            elevator = new Elevator();
+            try
+            {
+                elevator = new Elevator();
 
-            // Subscribe to elevator events (Observer Pattern)
-            elevator.FloorChanged += Elevator_FloorChanged;
-            elevator.DoorsOpened += Elevator_DoorsOpened;
-            elevator.DoorsClosed += Elevator_DoorsClosed;
-            elevator.MovementStarted += Elevator_MovementStarted;
-            elevator.MovementCompleted += Elevator_MovementCompleted;
+                
+                elevator.FloorChanged += Elevator_FloorChanged;
+                elevator.DoorsOpened += Elevator_DoorsOpened;
+                elevator.DoorsClosed += Elevator_DoorsClosed;
+                elevator.MovementStarted += Elevator_MovementStarted;
+                elevator.MovementCompleted += Elevator_MovementCompleted;
+                elevator.ErrorOccurred += Elevator_ErrorOccurred;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to initialize elevator: {ex.Message}", "Initialization Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        /// <summary>
-        /// Initialize timer for auto-closing doors
-        /// </summary>
         private void InitializeDoorCloseTimer()
         {
-            doorCloseTimer = new System.Windows.Forms.Timer();
-            doorCloseTimer.Interval = DOOR_OPEN_DURATION;
-            doorCloseTimer.Tick += DoorCloseTimer_Tick;
+            try
+            {
+                doorCloseTimer = new System.Windows.Forms.Timer();
+                doorCloseTimer.Interval = DOOR_OPEN_DURATION;
+                doorCloseTimer.Tick += DoorCloseTimer_Tick;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Timer initialization error: {ex.Message}");
+            }
         }
+
+        private void InitializeBackgroundWorker()
+        {
+            try
+            {
+                dbWorker = new BackgroundWorker();
+                dbWorker.WorkerReportsProgress = true;
+                dbWorker.WorkerSupportsCancellation = true;
+                dbWorker.DoWork += DbWorker_DoWork;
+                dbWorker.ProgressChanged += DbWorker_ProgressChanged;
+                dbWorker.RunWorkerCompleted += DbWorker_RunWorkerCompleted;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"BackgroundWorker initialization error: {ex.Message}");
+            }
+        }
+
+        #region BackgroundWorker Events 
+
+        private void DbWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            try
+            {
+                BackgroundWorker worker = sender as BackgroundWorker;
+                string operation = e.Argument as string;
+
+                if (operation == "LoadLogs")
+                {
+                    // Simulate database operation
+                    worker.ReportProgress(25, "Connecting to database...");
+                    System.Threading.Thread.Sleep(200);
+
+                    worker.ReportProgress(50, "Retrieving logs...");
+                    DataSet ds = elevator.GetLogger().GetDatabaseHelper().GetAllLogs();
+
+                    worker.ReportProgress(75, "Processing data...");
+                    System.Threading.Thread.Sleep(100);
+
+                    worker.ReportProgress(100, "Complete");
+                    e.Result = ds;
+                }
+            }
+            catch (Exception ex)
+            {
+                e.Result = new Exception($"Database operation failed: {ex.Message}");
+            }
+        }
+
+        private void DbWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            
+            string message = e.UserState as string;
+            System.Diagnostics.Debug.WriteLine($"Progress: {e.ProgressPercentage}% - {message}");
+        }
+
+        private void DbWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            try
+            {
+                if (e.Error != null)
+                {
+                    MessageBox.Show($"Error: {e.Error.Message}", "Database Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (e.Result is Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (e.Result is DataSet ds)
+                {
+                    if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                    {
+                        LogForm logForm = new LogForm(ds.Tables[0]);
+                        logForm.ShowDialog();
+                    }
+                    else
+                    {
+                        MessageBox.Show("No logs found!", "Elevator Logs",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error displaying logs: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
 
         private void DoorCloseTimer_Tick(object? sender, EventArgs e)
         {
-            doorCloseTimer.Stop();
-            // Auto-close doors after they've been open for a while
-            if (elevator.DoorsOpen && !liftAnimating && !doorAnimating)
+            try
             {
-                elevator.CloseDoors();
+                doorCloseTimer.Stop();
+                
+                if (elevator.DoorsOpen && !liftAnimating && !doorAnimating)
+                {
+                    elevator.CloseDoors();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Timer tick error: {ex.Message}");
             }
         }
 
@@ -84,30 +198,85 @@ namespace Lift
 
         private void Elevator_FloorChanged(object? sender, int floor)
         {
-            UpdateFloorDisplay(floor);
+            try
+            {
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() => UpdateFloorDisplay(floor)));
+                }
+                else
+                {
+                    UpdateFloorDisplay(floor);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Floor changed event error: {ex.Message}");
+            }
         }
 
         private void Elevator_DoorsOpened(object? sender, EventArgs e)
         {
-            AnimateDoors("open");
-            // Start timer to auto-close doors after 3 seconds
-            doorCloseTimer.Start();
+            try
+            {
+                AnimateDoors("open");
+                doorCloseTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Doors opened event error: {ex.Message}");
+            }
         }
 
         private void Elevator_DoorsClosed(object? sender, EventArgs e)
         {
-            doorCloseTimer.Stop(); // Stop auto-close timer
-            AnimateDoors("close");
+            try
+            {
+                doorCloseTimer.Stop();
+                AnimateDoors("close");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Doors closed event error: {ex.Message}");
+            }
         }
 
         private void Elevator_MovementStarted(object? sender, EventArgs e)
         {
-            AnimateLift();
+            try
+            {
+                AnimateLift();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Movement started event error: {ex.Message}");
+            }
         }
 
         private void Elevator_MovementCompleted(object? sender, EventArgs e)
         {
             // Doors will open automatically
+        }
+
+        private void Elevator_ErrorOccurred(object? sender, string errorMessage)
+        {
+            try
+            {
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() => MessageBox.Show(errorMessage, "Elevator Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning)));
+                }
+                else
+                {
+                    MessageBox.Show(errorMessage, "Elevator Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error event handler error: {ex.Message}");
+            }
         }
 
         #endregion
@@ -116,65 +285,85 @@ namespace Lift
 
         private void main_Load(object sender, EventArgs e)
         {
-            // Initialize display labels
-            lblFloor1Status.Text = "Floor 1";
-            lblFloor2Status.Text = "             ";
-            lblDisplayWindow.Text = "Floor 1";
+            try
+            {
+                // Initialize display labels
+                lblFloor1Status.Text = "Floor 1";
+                lblFloor2Status.Text = "            ";
+                lblDisplayWindow.Text = "Floor 1";
 
-            // Position elevator at Floor 1
-            liftBox.Top = FLOOR1_Y;
+                // Position elevator at Floor 1
+                liftBox.Top = FLOOR1_Y;
 
-            // Close doors initially
-            leftDoor1.Left = FLOOR1_LEFT_DOOR_CLOSED;
-            rightDoor1.Left = FLOOR1_RIGHT_DOOR_CLOSED;
-            leftDoor2.Left = FLOOR2_LEFT_DOOR_CLOSED;
-            rightDoor2.Left = FLOOR2_RIGHT_DOOR_CLOSED;
+                // Close doors initially
+                leftDoor1.Left = FLOOR1_LEFT_DOOR_CLOSED;
+                rightDoor1.Left = FLOOR1_RIGHT_DOOR_CLOSED;
+                leftDoor2.Left = FLOOR2_LEFT_DOOR_CLOSED;
+                rightDoor2.Left = FLOOR2_RIGHT_DOOR_CLOSED;
 
-            // Set timer intervals for smooth animation
-            doorTimer.Interval = 30;  // 30ms for smoother door animation
-            liftTimer.Interval = 30;  // 30ms for smoother lift animation
+                // Set timer intervals for smooth animation
+                doorTimer.Interval = 30;
+                liftTimer.Interval = 30;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Form load error: {ex.Message}", "Initialization Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         #endregion
 
         #region Animation Methods
 
-        /// <summary>
-        /// Animate doors opening or closing
-        /// </summary>
         private void AnimateDoors(string action)
         {
-            doorAction = action;
-            doorAnimating = true;
-            doorTimer.Start();
+            try
+            {
+                doorAction = action;
+                doorAnimating = true;
+                doorTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Animate doors error: {ex.Message}");
+            }
         }
 
-        /// <summary>
-        /// Animate lift movement
-        /// </summary>
         private void AnimateLift()
         {
-            liftTargetY = elevator.TargetFloor == 1 ? FLOOR1_Y : FLOOR2_Y;
-            liftAnimating = true;
-            liftTimer.Start();
+            try
+            {
+                liftTargetY = elevator.TargetFloor == 1 ? FLOOR1_Y : FLOOR2_Y;
+                liftAnimating = true;
+                liftTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Animate lift error: {ex.Message}");
+            }
         }
 
-        /// <summary>
-        /// Update floor display labels
-        /// </summary>
         private void UpdateFloorDisplay(int floor)
         {
-            lblDisplayWindow.Text = floor.ToString();
+            try
+            {
+                lblDisplayWindow.Text = floor.ToString();
 
-            if (floor == 1)
-            {
-                lblFloor1Status.Text = "Floor 1";
-                lblFloor2Status.Text = "            ";
+                if (floor == 1)
+                {
+                    lblFloor1Status.Text = "Floor 1";
+                    lblFloor2Status.Text = "            ";
+                }
+                else
+                {
+                    lblFloor1Status.Text = "            ";
+                    lblFloor2Status.Text = "Floor 2";
+                }
             }
-            else
+            catch (Exception ex)
             {
-                lblFloor1Status.Text = "            ";
-                lblFloor2Status.Text = "Floor 2";
+                System.Diagnostics.Debug.WriteLine($"Update display error: {ex.Message}");
             }
         }
 
@@ -184,121 +373,128 @@ namespace Lift
 
         private void doorTimer_Tick(object sender, EventArgs e)
         {
-            if (!doorAnimating) return;
-
-            bool animationComplete = false;
-
-            if (doorAction == "open")
+            try
             {
-                // Open doors - move apart
-                if (elevator.CurrentFloor == 1)
+                if (!doorAnimating) return;
+
+                bool animationComplete = false;
+
+                if (doorAction == "open")
                 {
-                    // Floor 1 doors
-                    if (leftDoor1.Left > FLOOR1_LEFT_DOOR_OPEN)
+                    if (elevator.CurrentFloor == 1)
                     {
-                        leftDoor1.Left -= DOOR_SPEED;
-                        rightDoor1.Left += DOOR_SPEED;
+                        if (leftDoor1.Left > FLOOR1_LEFT_DOOR_OPEN)
+                        {
+                            leftDoor1.Left -= DOOR_SPEED;
+                            rightDoor1.Left += DOOR_SPEED;
+                        }
+                        else
+                        {
+                            leftDoor1.Left = FLOOR1_LEFT_DOOR_OPEN;
+                            rightDoor1.Left = FLOOR1_RIGHT_DOOR_OPEN;
+                            animationComplete = true;
+                        }
                     }
                     else
                     {
-                        leftDoor1.Left = FLOOR1_LEFT_DOOR_OPEN;
-                        rightDoor1.Left = FLOOR1_RIGHT_DOOR_OPEN;
-                        animationComplete = true;
+                        if (leftDoor2.Left > FLOOR2_LEFT_DOOR_OPEN)
+                        {
+                            leftDoor2.Left -= DOOR_SPEED;
+                            rightDoor2.Left += DOOR_SPEED;
+                        }
+                        else
+                        {
+                            leftDoor2.Left = FLOOR2_LEFT_DOOR_OPEN;
+                            rightDoor2.Left = FLOOR2_RIGHT_DOOR_OPEN;
+                            animationComplete = true;
+                        }
                     }
                 }
-                else // Floor 2
+                else if (doorAction == "close")
                 {
-                    // Floor 2 doors
-                    if (leftDoor2.Left > FLOOR2_LEFT_DOOR_OPEN)
+                    if (elevator.CurrentFloor == 1)
                     {
-                        leftDoor2.Left -= DOOR_SPEED;
-                        rightDoor2.Left += DOOR_SPEED;
+                        if (leftDoor1.Left < FLOOR1_LEFT_DOOR_CLOSED)
+                        {
+                            leftDoor1.Left += DOOR_SPEED;
+                            rightDoor1.Left -= DOOR_SPEED;
+                        }
+                        else
+                        {
+                            leftDoor1.Left = FLOOR1_LEFT_DOOR_CLOSED;
+                            rightDoor1.Left = FLOOR1_RIGHT_DOOR_CLOSED;
+                            animationComplete = true;
+                        }
                     }
                     else
                     {
-                        leftDoor2.Left = FLOOR2_LEFT_DOOR_OPEN;
-                        rightDoor2.Left = FLOOR2_RIGHT_DOOR_OPEN;
-                        animationComplete = true;
+                        if (leftDoor2.Left < FLOOR2_LEFT_DOOR_CLOSED)
+                        {
+                            leftDoor2.Left += DOOR_SPEED;
+                            rightDoor2.Left -= DOOR_SPEED;
+                        }
+                        else
+                        {
+                            leftDoor2.Left = FLOOR2_LEFT_DOOR_CLOSED;
+                            rightDoor2.Left = FLOOR2_RIGHT_DOOR_CLOSED;
+                            animationComplete = true;
+                        }
                     }
+                }
+
+                if (animationComplete)
+                {
+                    doorTimer.Stop();
+                    doorAnimating = false;
                 }
             }
-            else if (doorAction == "close")
-            {
-                // Close doors - move together
-                if (elevator.CurrentFloor == 1)
-                {
-                    // Floor 1 doors
-                    if (leftDoor1.Left < FLOOR1_LEFT_DOOR_CLOSED)
-                    {
-                        leftDoor1.Left += DOOR_SPEED;
-                        rightDoor1.Left -= DOOR_SPEED;
-                    }
-                    else
-                    {
-                        leftDoor1.Left = FLOOR1_LEFT_DOOR_CLOSED;
-                        rightDoor1.Left = FLOOR1_RIGHT_DOOR_CLOSED;
-                        animationComplete = true;
-                    }
-                }
-                else // Floor 2
-                {
-                    // Floor 2 doors
-                    if (leftDoor2.Left < FLOOR2_LEFT_DOOR_CLOSED)
-                    {
-                        leftDoor2.Left += DOOR_SPEED;
-                        rightDoor2.Left -= DOOR_SPEED;
-                    }
-                    else
-                    {
-                        leftDoor2.Left = FLOOR2_LEFT_DOOR_CLOSED;
-                        rightDoor2.Left = FLOOR2_RIGHT_DOOR_CLOSED;
-                        animationComplete = true;
-                    }
-                }
-            }
-
-            if (animationComplete)
+            catch (Exception ex)
             {
                 doorTimer.Stop();
                 doorAnimating = false;
+                System.Diagnostics.Debug.WriteLine($"Door timer error: {ex.Message}");
             }
         }
 
         private void liftTimer_Tick(object sender, EventArgs e)
         {
-            if (!liftAnimating) return;
-
-            bool arrived = false;
-
-            // Move elevator towards target floor
-            if (liftBox.Top < liftTargetY)
+            try
             {
-                // Moving down to Floor 1
-                liftBox.Top += LIFT_SPEED;
-                if (liftBox.Top >= liftTargetY)
+                if (!liftAnimating) return;
+
+                bool arrived = false;
+
+                if (liftBox.Top < liftTargetY)
                 {
-                    liftBox.Top = liftTargetY;
-                    arrived = true;
+                    liftBox.Top += LIFT_SPEED;
+                    if (liftBox.Top >= liftTargetY)
+                    {
+                        liftBox.Top = liftTargetY;
+                        arrived = true;
+                    }
+                }
+                else if (liftBox.Top > liftTargetY)
+                {
+                    liftBox.Top -= LIFT_SPEED;
+                    if (liftBox.Top <= liftTargetY)
+                    {
+                        liftBox.Top = liftTargetY;
+                        arrived = true;
+                    }
+                }
+
+                if (arrived)
+                {
+                    liftTimer.Stop();
+                    liftAnimating = false;
+                    elevator.UpdatePosition();
                 }
             }
-            else if (liftBox.Top > liftTargetY)
-            {
-                // Moving up to Floor 2
-                liftBox.Top -= LIFT_SPEED;
-                if (liftBox.Top <= liftTargetY)
-                {
-                    liftBox.Top = liftTargetY;
-                    arrived = true;
-                }
-            }
-
-            if (arrived)
+            catch (Exception ex)
             {
                 liftTimer.Stop();
                 liftAnimating = false;
-
-                // Update elevator state - it has arrived
-                elevator.UpdatePosition();
+                System.Diagnostics.Debug.WriteLine($"Lift timer error: {ex.Message}");
             }
         }
 
@@ -308,27 +504,41 @@ namespace Lift
 
         private void btnUp_Click(object sender, EventArgs e)
         {
-            if (elevator.CurrentFloor != 1)
+            try
             {
-                elevator.RequestFloor(1);
+                if (elevator.CurrentFloor != 1)
+                {
+                    elevator.RequestFloor(1);
+                }
+                else
+                {
+                    elevator.OpenDoors();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // Already at floor 2, just open doors
-                elevator.OpenDoors();
+                MessageBox.Show($"Error: {ex.Message}", "Request Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void btnDown_Click(object sender, EventArgs e)
         {
-            if (elevator.CurrentFloor != 2)
+            try
             {
-                elevator.RequestFloor(2);
+                if (elevator.CurrentFloor != 2)
+                {
+                    elevator.RequestFloor(2);
+                }
+                else
+                {
+                    elevator.OpenDoors();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // Already at floor 1, just open doors
-                elevator.OpenDoors();
+                MessageBox.Show($"Error: {ex.Message}", "Request Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -338,64 +548,77 @@ namespace Lift
 
         private void btnFloor1_Click(object sender, EventArgs e)
         {
-            // Floor 1 button on control panel
-            elevator.RequestFloor(1);
+            try
+            {
+                elevator.RequestFloor(1);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Request Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnFloor2_Click(object sender, EventArgs e)
         {
-            // Floor 2 button on control panel
-            elevator.RequestFloor(2);
+            try
+            {
+                elevator.RequestFloor(2);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Request Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnOpen_Click(object sender, EventArgs e)
         {
-            // Open doors manually
-            doorCloseTimer.Stop(); // Stop auto-close
-            elevator.OpenDoors();
+            try
+            {
+                doorCloseTimer.Stop();
+                elevator.OpenDoors();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Door Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnClose_Click(object sender, EventArgs e)
         {
-            // Close doors manually
-            doorCloseTimer.Stop(); // Stop auto-close
-            elevator.CloseDoors();
+            try
+            {
+                doorCloseTimer.Stop();
+                elevator.CloseDoors();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Door Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnLog_Click(object sender, EventArgs e)
         {
-            // Show log form
-            ShowLogForm();
-        }
-
-        #endregion
-
-        #region Log Display
-
-        /// <summary>
-        /// Display logs in a new form
-        /// </summary>
-        private void ShowLogForm()
-        {
             try
             {
-                // Get all logs from database
-                DataSet ds = elevator.GetLogger().GetDatabaseHelper().GetAllLogs();
-
-                if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                // Use BackgroundWorker to load logs 
+                if (!dbWorker.IsBusy)
                 {
-                    // Create and show log form
-                    LogForm logForm = new LogForm(ds.Tables[0]);
-                    logForm.ShowDialog();
+                    dbWorker.RunWorkerAsync("LoadLogs");
                 }
                 else
                 {
-                    MessageBox.Show("No logs found!", "Elevator Logs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Loading logs, please wait...", "Busy",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading logs: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error loading logs: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -413,3 +636,7 @@ namespace Lift
         #endregion
     }
 }
+
+
+
+

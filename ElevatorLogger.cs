@@ -2,58 +2,123 @@
 
 namespace Lift
 {
-    /// <summary>
-    /// Handles logging of elevator operations
-    /// Follows Single Responsibility Principle
-    /// </summary>
+   
     public class ElevatorLogger
     {
         private DatabaseHelper dbHelper;
 
         public ElevatorLogger()
         {
-            dbHelper = new DatabaseHelper();
+            try
+            {
+                dbHelper = new DatabaseHelper();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Logger initialization error: {ex.Message}");
+                throw new InvalidOperationException("Failed to initialize elevator logger", ex);
+            }
         }
 
-        /// <summary>
-        /// Log elevator movement
-        /// </summary>
-        public void LogMovement(int fromFloor, int toFloor)
+       
+        public bool LogMovement(int fromFloor, int toFloor)
         {
-            string action = $"Move from Floor {fromFloor} to Floor {toFloor}";
-            dbHelper.InsertLog(action, fromFloor, toFloor, "Completed");
+            try
+            {
+                if (fromFloor < 1 || toFloor < 1)
+                {
+                    throw new ArgumentException("Invalid floor numbers");
+                }
+
+                string action = $"Move from Floor {fromFloor} to Floor {toFloor}";
+                return dbHelper.InsertLog(action, fromFloor, toFloor, "Completed");
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation error in LogMovement: {argEx.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging movement: {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Log door opening
-        /// </summary>
-        public void LogDoorOpen(int currentFloor)
+        public bool LogDoorOpen(int currentFloor)
         {
-            string action = $"Door Opened at Floor {currentFloor}";
-            dbHelper.InsertLog(action, currentFloor, currentFloor, "Door Open");
+            try
+            {
+                if (currentFloor < 1)
+                {
+                    throw new ArgumentException("Invalid floor number");
+                }
+
+                string action = $"Door Opened at Floor {currentFloor}";
+                return dbHelper.InsertLog(action, currentFloor, currentFloor, "Door Open");
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation error in LogDoorOpen: {argEx.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging door open: {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Log door closing
-        /// </summary>
-        public void LogDoorClose(int currentFloor)
+       
+        public bool LogDoorClose(int currentFloor)
         {
-            string action = $"Door Closed at Floor {currentFloor}";
-            dbHelper.InsertLog(action, currentFloor, currentFloor, "Door Closed");
+            try
+            {
+                if (currentFloor < 1)
+                {
+                    throw new ArgumentException("Invalid floor number");
+                }
+
+                string action = $"Door Closed at Floor {currentFloor}";
+                return dbHelper.InsertLog(action, currentFloor, currentFloor, "Door Closed");
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation error in LogDoorClose: {argEx.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging door close: {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Log floor request
-        /// </summary>
-        public void LogFloorRequest(int requestedFloor, int currentFloor)
+       
+        public bool LogFloorRequest(int requestedFloor, int currentFloor)
         {
-            string action = $"Floor {requestedFloor} Requested";
-            dbHelper.InsertLog(action, currentFloor, requestedFloor, "Request");
+            try
+            {
+                if (requestedFloor < 1 || currentFloor < 1)
+                {
+                    throw new ArgumentException("Invalid floor numbers");
+                }
+
+                string action = $"Floor {requestedFloor} Requested";
+                return dbHelper.InsertLog(action, currentFloor, requestedFloor, "Request");
+            }
+            catch (ArgumentException argEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"Validation error in LogFloorRequest: {argEx.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging floor request: {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Get database helper for direct access
-        /// </summary>
         public DatabaseHelper GetDatabaseHelper()
         {
             return dbHelper;

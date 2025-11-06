@@ -2,164 +2,292 @@
 
 namespace Lift
 {
-    /// <summary>
-    /// Represents the Elevator with its core functionality
-    /// Follows Single Responsibility Principle - handles only elevator logic
-    /// </summary>
+    
     public class Elevator
     {
-        // Properties
         public int CurrentFloor { get; private set; }
         public bool IsMoving { get; private set; }
         public bool DoorsOpen { get; private set; }
         public int TargetFloor { get; private set; }
 
-        // Logger
         private ElevatorLogger logger;
 
-        // Events for communication with GUI (Observer pattern)
+        
+        private FloorStateContext stateContext;
+
+        
         public event EventHandler<int>? FloorChanged;
         public event EventHandler? DoorsOpened;
         public event EventHandler? DoorsClosed;
         public event EventHandler? MovementStarted;
         public event EventHandler? MovementCompleted;
+        public event EventHandler<string>? ErrorOccurred;
 
-        // Constructor
+       
         public Elevator()
         {
-            CurrentFloor = 1;  // Start at ground floor
-            IsMoving = false;
-            DoorsOpen = false;
-            TargetFloor = 1;
-            logger = new ElevatorLogger();
+            try
+            {
+                CurrentFloor = 1;  
+                IsMoving = false;
+                DoorsOpen = false;
+                TargetFloor = 1;
+                logger = new ElevatorLogger();
+                stateContext = new FloorStateContext(); 
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Elevator initialization error: {ex.Message}");
+                throw new InvalidOperationException("Failed to initialize elevator system", ex);
+            }
         }
 
-        /// <summary>
-        /// Request elevator to move to a specific floor
-        /// </summary>
+        
         public void RequestFloor(int floor)
         {
-            if (floor < 1 || floor > 2)
-                throw new ArgumentException("Invalid floor number");
-
-            // Log the request
-            logger.LogFloorRequest(floor, CurrentFloor);
-
-            if (CurrentFloor == floor)
+            try
             {
-                // Already at the floor, just open doors
-                if (!DoorsOpen)
+                
+                if (!FloorStateFactory.IsValidFloor(floor))
                 {
-                    OpenDoors();
+                    string errorMsg = $"Invalid floor number: {floor}";
+                    ErrorOccurred?.Invoke(this, errorMsg);
+                    throw new ArgumentException(errorMsg);
                 }
-                return;
-            }
 
-            TargetFloor = floor;
+                
+                if (IsMoving)
+                {
+                    System.Diagnostics.Debug.WriteLine("Request ignored - elevator is moving");
+                    return;
+                }
 
-            // Close doors if open, then move
-            if (DoorsOpen)
-            {
-                CloseDoors();
+               
+                try
+                {
+                    logger.LogFloorRequest(floor, CurrentFloor);
+                }
+                catch (Exception logEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Logging error: {logEx.Message}");
+                    
+                }
+
+                if (CurrentFloor == floor)
+                {
+                   
+                    if (!DoorsOpen)
+                    {
+                        OpenDoors();
+                    }
+                    return;
+                }
+
+                TargetFloor = floor;
+
+               
+                if (DoorsOpen)
+                {
+                    CloseDoors();
+                }
+                else
+                {
+                    
+                    CloseDoors(); 
+                }
             }
-            else
+            catch (ArgumentException)
             {
-                // Doors already closed, start moving immediately
-                CloseDoors(); // This will trigger movement
+                throw; 
+            }
+            catch (Exception ex)
+            {
+                string errorMsg = $"Error requesting floor {floor}: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                ErrorOccurred?.Invoke(this, errorMsg);
+                throw new InvalidOperationException(errorMsg, ex);
             }
         }
 
-        /// <summary>
-        /// Open elevator doors
-        /// </summary>
         public void OpenDoors()
         {
-            if (!DoorsOpen && !IsMoving)
+            try
             {
-                DoorsOpen = true;
-                logger.LogDoorOpen(CurrentFloor);
-                DoorsOpened?.Invoke(this, EventArgs.Empty);
+                if (!DoorsOpen && !IsMoving)
+                {
+                    DoorsOpen = true;
+
+                   
+                    try
+                    {
+                        logger.LogDoorOpen(CurrentFloor);
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Logging error: {logEx.Message}");
+                    }
+
+                    DoorsOpened?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                string errorMsg = $"Error opening doors: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                ErrorOccurred?.Invoke(this, errorMsg);
             }
         }
 
-        /// <summary>
-        /// Close elevator doors and start moving if needed
-        /// </summary>
+     
         public void CloseDoors()
         {
-            if (DoorsOpen)
+            try
             {
-                DoorsOpen = false;
-                logger.LogDoorClose(CurrentFloor);
-                DoorsClosed?.Invoke(this, EventArgs.Empty);
-
-                // Start moving if target floor is different
-                if (TargetFloor != CurrentFloor)
+                if (DoorsOpen)
                 {
-                    StartMoving();
+                    DoorsOpen = false;
+
+                    // Log with exception handling
+                    try
+                    {
+                        logger.LogDoorClose(CurrentFloor);
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Logging error: {logEx.Message}");
+                    }
+
+                    DoorsClosed?.Invoke(this, EventArgs.Empty);
+
+                    // Start moving if target floor is different
+                    if (TargetFloor != CurrentFloor)
+                    {
+                        StartMoving();
+                    }
+                }
+                else
+                {
+                    // Doors already closed, just start moving
+                    if (TargetFloor != CurrentFloor && !IsMoving)
+                    {
+                        StartMoving();
+                    }
                 }
             }
-            else
+            catch (Exception ex)
             {
-                // Doors already closed, just start moving
-                if (TargetFloor != CurrentFloor && !IsMoving)
-                {
-                    StartMoving();
-                }
+                string errorMsg = $"Error closing doors: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                ErrorOccurred?.Invoke(this, errorMsg);
             }
         }
 
-        /// <summary>
-        /// Start elevator movement
-        /// </summary>
+   
         private void StartMoving()
         {
-            IsMoving = true;
-            MovementStarted?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                IsMoving = true;
+                MovementStarted?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                IsMoving = false;
+                string errorMsg = $"Error starting movement: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                ErrorOccurred?.Invoke(this, errorMsg);
+            }
         }
 
-        /// <summary>
-        /// Update elevator position (called by timer when animation completes)
-        /// </summary>
+     
         public void UpdatePosition()
         {
-            if (!IsMoving) return;
+            try
+            {
+                if (!IsMoving) return;
 
-            int fromFloor = CurrentFloor;
+                int fromFloor = CurrentFloor;
 
-            // Update current floor
-            CurrentFloor = TargetFloor;
-            IsMoving = false;
+                // Update current floor
+                CurrentFloor = TargetFloor;
+                IsMoving = false;
 
-            // Log the movement
-            logger.LogMovement(fromFloor, CurrentFloor);
+                // STATE PATTERN: Dynamic state dispatching without if/switch
+                try
+                {
+                    stateContext.ChangeFloor(CurrentFloor);
+                }
+                catch (Exception stateEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"State change error: {stateEx.Message}");
+                    // Continue operation even if state change fails
+                }
 
-            FloorChanged?.Invoke(this, CurrentFloor);
-            MovementCompleted?.Invoke(this, EventArgs.Empty);
+                
+                try
+                {
+                    logger.LogMovement(fromFloor, CurrentFloor);
+                }
+                catch (Exception logEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Logging error: {logEx.Message}");
+                    // Continue operation even if logging fails
+                }
 
-            // Open doors when arrived
-            OpenDoors();
+                FloorChanged?.Invoke(this, CurrentFloor);
+                MovementCompleted?.Invoke(this, EventArgs.Empty);
+
+                // Open doors when arrived
+                OpenDoors();
+            }
+            catch (Exception ex)
+            {
+                IsMoving = false;
+                string errorMsg = $"Error updating position: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                ErrorOccurred?.Invoke(this, errorMsg);
+            }
         }
 
-        /// <summary>
-        /// Get current status as string
-        /// </summary>
+    
         public string GetStatus()
         {
-            if (IsMoving)
-                return $"Moving to Floor {TargetFloor}";
-            else if (DoorsOpen)
-                return $"Floor {CurrentFloor} - Doors Open";
-            else
-                return $"Floor {CurrentFloor} - Doors Closed";
+            try
+            {
+                string floorName = stateContext.GetCurrentFloorName();
+
+                if (IsMoving)
+                    return $"Moving to Floor {TargetFloor}";
+                else if (DoorsOpen)
+                    return $"{floorName} - Doors Open";
+                else
+                    return $"{floorName} - Doors Closed";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting status: {ex.Message}");
+                return $"Floor {CurrentFloor}";
+            }
         }
 
-        /// <summary>
-        /// Get logger for accessing database (for log display)
-        /// </summary>
+  
         public ElevatorLogger GetLogger()
         {
             return logger;
+        }
+
+   
+        public IFloorState GetCurrentState()
+        {
+            try
+            {
+                return stateContext.GetCurrentState();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting state: {ex.Message}");
+                return null;
+            }
         }
     }
 }
